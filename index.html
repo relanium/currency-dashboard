@@ -25,7 +25,7 @@
             h1 { font-size: 20px; margin-bottom: 15px; }
             .controls { padding: 10px; gap: 10px; }
             .control-group { min-width: 45%; }
-            .chart-wrapper { height: 400px; margin-top: 10px; }
+            .chart-wrapper { height: 420px; margin-top: 10px; }
             select, input { font-size: 16px; }
         }
     </style>
@@ -192,7 +192,7 @@
                         yAxisID: 'y',
                         fill: true, 
                         tension: 0.3,
-                        hidden: isMobile // Приховуємо USD на мобілках за замовчуванням
+                        hidden: isMobile 
                     },
                     { 
                         label: `EUR`, 
@@ -202,7 +202,7 @@
                         yAxisID: 'y',
                         fill: true, 
                         tension: 0.3,
-                        hidden: isMobile // Приховуємо EUR на мобілках за замовчуванням
+                        hidden: isMobile 
                     },
                     { 
                         label: `1 PLN в UAH`, 
@@ -225,7 +225,7 @@
                         type: 'linear',
                         display: !isMobile,
                         position: 'left',
-                        ticks: { callback: value => value.toFixed(2) + symbol } 
+                        ticks: { callback: value => parseFloat(value).toFixed(2) + symbol } 
                     },
                     yCross: {
                         type: 'linear',
@@ -252,6 +252,7 @@
                                 let label = context.dataset.label || '';
                                 if (label) label += ': ';
                                 if (context.parsed.y !== null) {
+                                    // Автоматично додаємо правильну валюту в підказку
                                     label += context.parsed.y + (context.datasetIndex === 2 ? ' ₴' : symbol);
                                 }
                                 return label;
@@ -263,8 +264,11 @@
         });
     }
 
+    // Слухач зміни розміру вікна для адаптивності
+    let resizeTimer;
     window.addEventListener('resize', () => {
-        if (myChart) updateDashboard();
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(updateDashboard, 250);
     });
 
     ['periodSelect', 'monthSelect', 'dateFrom', 'dateTo', 'baseCurrency', 'sourceSelect'].forEach(id => {
