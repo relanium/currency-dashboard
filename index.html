@@ -3,79 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Моніторинг курсу валют</title>
+    <title>Currency Dashboard 2026</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 20px auto; padding: 10px; background: #f0f2f5; }
-        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        h1 { color: #1a73e8; text-align: center; margin-bottom: 30px; }
-        canvas { width: 100% !important; height: auto !important; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; max-width: 1100px; margin: 20px auto; padding: 10px; background: #f4f7f9; }
+        .container { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h1 { color: #1a73e8; text-align: center; margin-bottom: 25px; }
+        .controls { 
+            display: flex; gap: 15px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;
+            background: #f8f9fa; padding: 20px; border-radius: 12px; align-items: flex-end;
+        }
+        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 11px; color: #5f6368; font-weight: bold; text-transform: uppercase; }
+        select, input { padding: 8px 10px; border-radius: 8px; border: 1px solid #dadce0; font-size: 14px; }
+        .chart-wrapper { position: relative; height: 500px; width: 100%; margin-top: 20px; }
+        .btn-reset { padding: 8px 15px; background: #1a73e8; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .btn-reset:hover { background: #1557b0; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Динаміка ринкового курсу</h1>
-        <canvas id="currencyChart"></canvas>
+
+<div class="container">
+    <h1>Моніторинг валют 2026</h1>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>Швидкий період</label>
+            <select id="periodSelect">
+                <option value="all">За весь час</option>
+                <option value="7">7 днів</option>
+                <option value="14">14 днів</option>
+                <option value="30" selected>30 днів</option>
+                <option value="custom">--- Ручний вибір ---</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Місяць</label>
+            <select id="monthSelect">
+                <option value="any">Оберіть місяць...</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>З дати</label>
+            <input type="date" id="dateFrom">
+        </div>
+
+        <div class="control-group">
+            <label>По дату</label>
+            <input type="date" id="dateTo">
+        </div>
+
+        <div class="control-group">
+            <label>Валюта до:</label>
+            <select id="baseCurrency">
+                <option value="UAH">UAH (₴)</option>
+                <option value="PLN">PLN (zł)</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Джерело</label>
+            <select id="sourceSelect">
+                <option value="Market">Ринок</option>
+                <option value="CentralBank">Банки</option>
+            </select>
+        </div>
     </div>
 
-    <script>
-        const csvUrl = 'currency_history.csv';
+    <div class="chart-wrapper">
+        <canvas id="currencyChart"></canvas>
+    </div>
+</div>
 
-        Papa.parse(csvUrl, {
-            download: true,
-            header: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                const data = results.data;
-                
-                // Витягуємо дані з твоїх колонок
-                const labels = data.map(row => row['Дата']);
-                const usdMarket = data.map(row => parseFloat(row['Market_USD_UAH']));
-                const eurMarket = data.map(row => parseFloat(row['Market_EUR_UAH']));
+<script>
+    let fullData = [];
+    let myChart;
 
-                const ctx = document.getElementById('currencyChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: 'USD (Ринок)',
-                                data: usdMarket,
-                                borderColor: '#1a73e8',
-                                backgroundColor: 'transparent',
-                                borderWidth: 3,
-                                pointRadius: 2,
-                                tension: 0.3
-                            },
-                            {
-                                label: 'EUR (Ринок)',
-                                data: eurMarket,
-                                borderColor: '#e91e63',
-                                backgroundColor: 'transparent',
-                                borderWidth: 2,
-                                pointRadius: 2,
-                                tension: 0.3
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { position: 'top' },
-                            tooltip: { mode: 'index', intersect: false }
-                        },
-                        scales: { 
-                            y: { 
-                                beginAtZero: false,
-                                ticks: { callback: value => value + ' ₴' }
-                            } 
-                        }
-                    }
-                });
+    Papa.parse('currency_history.csv', {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            fullData = results.data.filter(row => row['Дата'] && row['Дата'].trim() !== "");
+            populateMonths();
+            updateDashboard();
+        }
+    });
+
+    // Допоміжна функція для перетворення "20.01.2026 16:39" у об'єкт Date
+    function parseCsvDate(dateStr) {
+        const [dmy, time] = dateStr.split(' ');
+        const [d, m, y] = dmy.split('.');
+        return new Date(y, m - 1, d);
+    }
+
+    // Заповнюємо список місяців на основі даних
+    function populateMonths() {
+        const monthSelect = document.getElementById('monthSelect');
+        const monthsFound = new Set();
+        
+        fullData.forEach(row => {
+            const date = parseCsvDate(row['Дата']);
+            const label = date.toLocaleString('uk-UA', { month: 'long', year: 'numeric' });
+            const value = `${date.getMonth()}-${date.getFullYear()}`;
+            if (!monthsFound.has(value)) {
+                monthsFound.add(value);
+                let opt = document.createElement('option');
+                opt.value = value;
+                opt.innerHTML = label;
+                monthSelect.appendChild(opt);
             }
         });
-    </script>
+    }
+
+    function updateDashboard() {
+        const period = document.getElementById('periodSelect').value;
+        const monthFilter = document.getElementById('monthSelect').value;
+        const dateFrom = document.getElementById('dateFrom').value;
+        const dateTo = document.getElementById('dateTo').value;
+        const base = document.getElementById('baseCurrency').value;
+        const source = document.getElementById('sourceSelect').value;
+
+        let filteredData = [...fullData];
+
+        // 1. Фільтр за місяцем
+        if (monthFilter !== 'any') {
+            const [m, y] = monthFilter.split('-');
+            filteredData = filteredData.filter(row => {
+                const d = parseCsvDate(row['Дата']);
+                return d.getMonth() == m && d.getFullYear() == y;
+            });
+            document.getElementById('periodSelect').value = 'custom';
+        } 
+        // 2. Фільтр за точними датами
+        else if (dateFrom || dateTo) {
+            const from = dateFrom ? new Date(dateFrom) : new Date(0);
+            const to = dateTo ? new Date(dateTo) : new Date();
+            filteredData = filteredData.filter(row => {
+                const d = parseCsvDate(row['Дата']);
+                return d >= from && d <= to;
+            });
+            document.getElementById('periodSelect').value = 'custom';
+        }
+        // 3. Швидкі періоди
+        else if (period !== 'all') {
+            filteredData = fullData.slice(-parseInt(period));
+        }
+
+        // Визначення колонок
+        let usdCol, eurCol;
+        if (source === 'Market') {
+            usdCol = `Market_USD_${base}`;
+            eurCol = `Market_EUR_${base}`;
+        } else {
+            const suffix = (base === 'UAH') ? 'NBU' : 'NBP';
+            usdCol = `USD_${suffix}`;
+            eurCol = `EUR_${suffix}`;
+        }
+        
+        const symbol = (base === 'UAH') ? ' ₴' : ' zł';
+        const labels = filteredData.map(row => row['Дата'].split(' ')[0]);
+        const usdValues = filteredData.map(row => parseFloat(row[usdCol]) || null);
+        const eurValues = filteredData.map(row => parseFloat(row[eurCol]) || null);
+
+        const ctx = document.getElementById('currencyChart').getContext('2d');
+        if (myChart) myChart.destroy();
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: `USD (${usdCol})`, data: usdValues, borderColor: '#1a73e8', backgroundColor: 'rgba(26, 115, 232, 0.1)', fill: true, tension: 0.3 },
+                    { label: `EUR (${eurCol})`, data: eurValues, borderColor: '#e91e63', backgroundColor: 'rgba(233, 30, 99, 0.1)', fill: true, tension: 0.3 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { ticks: { callback: value => value + symbol } }
+                }
+            }
+        });
+    }
+
+    // Слухачі
+    ['periodSelect', 'monthSelect', 'dateFrom', 'dateTo', 'baseCurrency', 'sourceSelect'].forEach(id => {
+        document.getElementById(id).addEventListener('change', (e) => {
+            // Скидання конфліктуючих фільтрів
+            if (e.target.id === 'periodSelect' && e.target.value !== 'custom') {
+                document.getElementById('monthSelect').value = 'any';
+                document.getElementById('dateFrom').value = '';
+                document.getElementById('dateTo').value = '';
+            }
+            updateDashboard();
+        });
+    });
+</script>
 </body>
 </html>
