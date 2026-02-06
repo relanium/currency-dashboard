@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Currency Dashboard 2026</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
@@ -14,10 +14,21 @@
             display: flex; gap: 15px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;
             background: #f8f9fa; padding: 20px; border-radius: 12px; align-items: flex-end;
         }
-        .control-group { display: flex; flex-direction: column; gap: 5px; }
+        .control-group { display: flex; flex-direction: column; gap: 5px; flex-grow: 1; min-width: 150px; }
         label { font-size: 11px; color: #5f6368; font-weight: bold; text-transform: uppercase; }
-        select, input { padding: 8px 10px; border-radius: 8px; border: 1px solid #dadce0; font-size: 14px; }
+        select, input { padding: 10px; border-radius: 8px; border: 1px solid #dadce0; font-size: 14px; background: white; }
         .chart-wrapper { position: relative; height: 550px; width: 100%; margin-top: 20px; }
+
+        /* АДАПТАЦІЯ ДЛЯ МОБІЛЬНИХ ПРИСТРОЇВ */
+        @media (max-width: 600px) {
+            body { margin: 0; padding: 5px; }
+            .container { padding: 15px; border-radius: 12px; }
+            h1 { font-size: 20px; margin-bottom: 15px; }
+            .controls { padding: 10px; gap: 10px; }
+            .control-group { min-width: 45%; } /* Кнопки стають у два стовпчики */
+            .chart-wrapper { height: 400px; margin-top: 10px; }
+            select, input { font-size: 16px; } /* Щоб iPhone не зумив при кліку */
+        }
     </style>
 </head>
 <body>
@@ -27,20 +38,20 @@
     
     <div class="controls">
         <div class="control-group">
-            <label>Швидкий період</label>
+            <label>Період</label>
             <select id="periodSelect">
                 <option value="all">За весь час</option>
                 <option value="7">7 днів</option>
                 <option value="14">14 днів</option>
                 <option value="30" selected>30 днів</option>
-                <option value="custom">--- Ручний вибір ---</option>
+                <option value="custom">--- Ручний ---</option>
             </select>
         </div>
 
         <div class="control-group">
             <label>Місяць</label>
             <select id="monthSelect">
-                <option value="any">Оберіть місяць...</option>
+                <option value="any">Оберіть...</option>
             </select>
         </div>
 
@@ -55,7 +66,7 @@
         </div>
 
         <div class="control-group">
-            <label>Валюта до:</label>
+            <label>До валюти:</label>
             <select id="baseCurrency">
                 <option value="UAH">UAH (₴)</option>
                 <option value="PLN">PLN (zł)</option>
@@ -141,7 +152,6 @@
             filteredData = fullData.slice(-parseInt(period));
         }
 
-        // 1. Визначення колонок для основних графіків
         let usdCol, eurCol;
         if (source === 'Market') {
             usdCol = `Market_USD_${base}`;
@@ -152,8 +162,6 @@
             eurCol = `EUR_${suffix}`;
         }
         
-        // 2. Визначення колонок для розрахунку Крос-курсу UAH/PLN
-        // Беремо курси долара для обох валют, щоб вирахувати їх співвідношення
         let usdUahCol = (source === 'Market') ? 'Market_USD_UAH' : 'USD_NBU';
         let usdPlnCol = (source === 'Market') ? 'Market_USD_PLN' : 'USD_NBP';
 
@@ -163,7 +171,6 @@
         const usdValues = filteredData.map(row => parseFloat(row[usdCol]) || null);
         const eurValues = filteredData.map(row => parseFloat(row[eurCol]) || null);
         
-        // Розраховуємо крос-курс: скільки гривень коштує 1 злотий
         const crossRateValues = filteredData.map(row => {
             const uah = parseFloat(row[usdUahCol]);
             const pln = parseFloat(row[usdPlnCol]);
@@ -173,13 +180,16 @@
         const ctx = document.getElementById('currencyChart').getContext('2d');
         if (myChart) myChart.destroy();
 
+        // Хак для мобільної легенди
+        const isMobile = window.innerWidth < 600;
+
         myChart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
                 datasets: [
                     { 
-                        label: `USD (${usdCol})`, 
+                        label: `USD`, 
                         data: usdValues, 
                         borderColor: '#1a73e8', 
                         backgroundColor: 'rgba(26, 115, 232, 0.05)', 
@@ -188,7 +198,7 @@
                         tension: 0.3 
                     },
                     { 
-                        label: `EUR (${eurCol})`, 
+                        label: `EUR`, 
                         data: eurValues, 
                         borderColor: '#e91e63', 
                         backgroundColor: 'rgba(233, 30, 99, 0.05)', 
@@ -197,13 +207,13 @@
                         tension: 0.3 
                     },
                     { 
-                        label: `Крос-курс (1 PLN в UAH)`, 
+                        label: `PLN/UAH`, 
                         data: crossRateValues, 
                         borderColor: '#2ecc71', 
                         backgroundColor: 'transparent', 
-                        borderWidth: 4,
-                        yAxisID: 'yCross', // Окрема вісь праворуч
-                        pointRadius: 3,
+                        borderWidth: isMobile ? 2 : 4,
+                        yAxisID: 'yCross',
+                        pointRadius: isMobile ? 1 : 3,
                         tension: 0.3 
                     }
                 ]
@@ -215,37 +225,37 @@
                 scales: {
                     y: { 
                         type: 'linear',
-                        display: true,
+                        display: !isMobile, // Приховуємо ліву шкалу на мобільних для простору
                         position: 'left',
-                        title: { display: true, text: `Курс до ${base}` },
                         ticks: { callback: value => value + symbol } 
                     },
                     yCross: {
                         type: 'linear',
                         display: true,
-                        position: 'right',
-                        title: { display: true, text: 'Гривень за 1 злотий (₴/zł)' },
-                        grid: { drawOnChartArea: false }, // Прибираємо накладання сітки
+                        position: isMobile ? 'left' : 'right', // На мобільних ставимо основну шкалу зліва
+                        title: { display: !isMobile, text: 'Гривень за 1 злотий' },
+                        grid: { drawOnChartArea: !isMobile },
                         ticks: { callback: value => value + ' ₴' }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: { size: 10 }
+                        }
                     }
                 },
                 plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.dataset.label || '';
-                                if (label) label += ': ';
-                                if (context.parsed.y !== null) {
-                                    label += context.parsed.y + (context.datasetIndex === 2 ? ' ₴' : symbol);
-                                }
-                                return label;
-                            }
-                        }
+                    legend: {
+                        position: isMobile ? 'bottom' : 'top',
+                        labels: { boxWidth: 10, font: { size: 12 } }
                     }
                 }
             }
         });
     }
+
+    window.addEventListener('resize', updateDashboard);
 
     ['periodSelect', 'monthSelect', 'dateFrom', 'dateTo', 'baseCurrency', 'sourceSelect'].forEach(id => {
         document.getElementById(id).addEventListener('change', (e) => {
