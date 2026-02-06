@@ -7,43 +7,71 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <style>
-        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 10px; background: #f4f4f9; }
-        canvas { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; text-align: center; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 20px auto; padding: 10px; background: #f0f2f5; }
+        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { color: #1a73e8; text-align: center; margin-bottom: 30px; }
+        canvas { width: 100% !important; height: auto !important; }
     </style>
 </head>
 <body>
-    <h1>Динаміка курсу валют</h1>
-    <canvas id="currencyChart"></canvas>
+    <div class="container">
+        <h1>Динаміка ринкового курсу</h1>
+        <canvas id="currencyChart"></canvas>
+    </div>
 
     <script>
-        const csvUrl = 'currency_history.csv'; // Шлях до твого файлу
+        const csvUrl = 'currency_history.csv';
 
         Papa.parse(csvUrl, {
             download: true,
             header: true,
+            skipEmptyLines: true,
             complete: function(results) {
-                const data = results.data.filter(row => row.Date); // Відсікаємо порожні рядки
-                const labels = data.map(row => row.Date);
-                const usdSales = data.map(row => parseFloat(row.USD_Sale));
+                const data = results.data;
+                
+                // Витягуємо дані з твоїх колонок
+                const labels = data.map(row => row['Дата']);
+                const usdMarket = data.map(row => parseFloat(row['Market_USD_UAH']));
+                const eurMarket = data.map(row => parseFloat(row['Market_EUR_UAH']));
 
                 const ctx = document.getElementById('currencyChart').getContext('2d');
                 new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: labels,
-                        datasets: [{
-                            label: 'Курс USD (Продаж)',
-                            data: usdSales,
-                            borderColor: '#2ecc71',
-                            backgroundColor: 'rgba(46, 204, 113, 0.2)',
-                            fill: true,
-                            tension: 0.3
-                        }]
+                        datasets: [
+                            {
+                                label: 'USD (Ринок)',
+                                data: usdMarket,
+                                borderColor: '#1a73e8',
+                                backgroundColor: 'transparent',
+                                borderWidth: 3,
+                                pointRadius: 2,
+                                tension: 0.3
+                            },
+                            {
+                                label: 'EUR (Ринок)',
+                                data: eurMarket,
+                                borderColor: '#e91e63',
+                                backgroundColor: 'transparent',
+                                borderWidth: 2,
+                                pointRadius: 2,
+                                tension: 0.3
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
-                        scales: { y: { beginAtZero: false } }
+                        plugins: {
+                            legend: { position: 'top' },
+                            tooltip: { mode: 'index', intersect: false }
+                        },
+                        scales: { 
+                            y: { 
+                                beginAtZero: false,
+                                ticks: { callback: value => value + ' ₴' }
+                            } 
+                        }
                     }
                 });
             }
