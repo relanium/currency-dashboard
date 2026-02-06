@@ -17,9 +17,7 @@
         .control-group { display: flex; flex-direction: column; gap: 5px; }
         label { font-size: 11px; color: #5f6368; font-weight: bold; text-transform: uppercase; }
         select, input { padding: 8px 10px; border-radius: 8px; border: 1px solid #dadce0; font-size: 14px; }
-        .chart-wrapper { position: relative; height: 500px; width: 100%; margin-top: 20px; }
-        .btn-reset { padding: 8px 15px; background: #1a73e8; color: white; border: none; border-radius: 8px; cursor: pointer; }
-        .btn-reset:hover { background: #1557b0; }
+        .chart-wrapper { position: relative; height: 550px; width: 100%; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -93,18 +91,15 @@
         }
     });
 
-    // Допоміжна функція для перетворення "20.01.2026 16:39" у об'єкт Date
     function parseCsvDate(dateStr) {
         const [dmy, time] = dateStr.split(' ');
         const [d, m, y] = dmy.split('.');
         return new Date(y, m - 1, d);
     }
 
-    // Заповнюємо список місяців на основі даних
     function populateMonths() {
         const monthSelect = document.getElementById('monthSelect');
         const monthsFound = new Set();
-        
         fullData.forEach(row => {
             const date = parseCsvDate(row['Дата']);
             const label = date.toLocaleString('uk-UA', { month: 'long', year: 'numeric' });
@@ -129,31 +124,24 @@
 
         let filteredData = [...fullData];
 
-        // 1. Фільтр за місяцем
         if (monthFilter !== 'any') {
             const [m, y] = monthFilter.split('-');
             filteredData = filteredData.filter(row => {
                 const d = parseCsvDate(row['Дата']);
                 return d.getMonth() == m && d.getFullYear() == y;
             });
-            document.getElementById('periodSelect').value = 'custom';
-        } 
-        // 2. Фільтр за точними датами
-        else if (dateFrom || dateTo) {
+        } else if (dateFrom || dateTo) {
             const from = dateFrom ? new Date(dateFrom) : new Date(0);
             const to = dateTo ? new Date(dateTo) : new Date();
             filteredData = filteredData.filter(row => {
                 const d = parseCsvDate(row['Дата']);
                 return d >= from && d <= to;
             });
-            document.getElementById('periodSelect').value = 'custom';
-        }
-        // 3. Швидкі періоди
-        else if (period !== 'all') {
+        } else if (period !== 'all') {
             filteredData = fullData.slice(-parseInt(period));
         }
 
-        // Визначення колонок
+        // 1. Визначення колонок для основних графіків
         let usdCol, eurCol;
         if (source === 'Market') {
             usdCol = `Market_USD_${base}`;
@@ -164,10 +152,23 @@
             eurCol = `EUR_${suffix}`;
         }
         
+        // 2. Визначення колонок для розрахунку Крос-курсу UAH/PLN
+        // Беремо курси долара для обох валют, щоб вирахувати їх співвідношення
+        let usdUahCol = (source === 'Market') ? 'Market_USD_UAH' : 'USD_NBU';
+        let usdPlnCol = (source === 'Market') ? 'Market_USD_PLN' : 'USD_NBP';
+
         const symbol = (base === 'UAH') ? ' ₴' : ' zł';
         const labels = filteredData.map(row => row['Дата'].split(' ')[0]);
+        
         const usdValues = filteredData.map(row => parseFloat(row[usdCol]) || null);
         const eurValues = filteredData.map(row => parseFloat(row[eurCol]) || null);
+        
+        // Розраховуємо крос-курс: скільки гривень коштує 1 злотий
+        const crossRateValues = filteredData.map(row => {
+            const uah = parseFloat(row[usdUahCol]);
+            const pln = parseFloat(row[usdPlnCol]);
+            return (uah && pln) ? (uah / pln).toFixed(3) : null;
+        });
 
         const ctx = document.getElementById('currencyChart').getContext('2d');
         if (myChart) myChart.destroy();
@@ -177,24 +178,77 @@
             data: {
                 labels: labels,
                 datasets: [
-                    { label: `USD (${usdCol})`, data: usdValues, borderColor: '#1a73e8', backgroundColor: 'rgba(26, 115, 232, 0.1)', fill: true, tension: 0.3 },
-                    { label: `EUR (${eurCol})`, data: eurValues, borderColor: '#e91e63', backgroundColor: 'rgba(233, 30, 99, 0.1)', fill: true, tension: 0.3 }
+                    { 
+                        label: `USD (${usdCol})`, 
+                        data: usdValues, 
+                        borderColor: '#1a73e8', 
+                        backgroundColor: 'rgba(26, 115, 232, 0.05)', 
+                        yAxisID: 'y',
+                        fill: true, 
+                        tension: 0.3 
+                    },
+                    { 
+                        label: `EUR (${eurCol})`, 
+                        data: eurValues, 
+                        borderColor: '#e91e63', 
+                        backgroundColor: 'rgba(233, 30, 99, 0.05)', 
+                        yAxisID: 'y',
+                        fill: true, 
+                        tension: 0.3 
+                    },
+                    { 
+                        label: `Крос-курс (1 PLN в UAH)`, 
+                        data: crossRateValues, 
+                        borderColor: '#2ecc71', 
+                        backgroundColor: 'transparent', 
+                        borderWidth: 4,
+                        yAxisID: 'yCross', // Окрема вісь праворуч
+                        pointRadius: 3,
+                        tension: 0.3 
+                    }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
                 scales: {
-                    y: { ticks: { callback: value => value + symbol } }
+                    y: { 
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: `Курс до ${base}` },
+                        ticks: { callback: value => value + symbol } 
+                    },
+                    yCross: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: 'Гривень за 1 злотий (₴/zł)' },
+                        grid: { drawOnChartArea: false }, // Прибираємо накладання сітки
+                        ticks: { callback: value => value + ' ₴' }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y + (context.datasetIndex === 2 ? ' ₴' : symbol);
+                                }
+                                return label;
+                            }
+                        }
+                    }
                 }
             }
         });
     }
 
-    // Слухачі
     ['periodSelect', 'monthSelect', 'dateFrom', 'dateTo', 'baseCurrency', 'sourceSelect'].forEach(id => {
         document.getElementById(id).addEventListener('change', (e) => {
-            // Скидання конфліктуючих фільтрів
             if (e.target.id === 'periodSelect' && e.target.value !== 'custom') {
                 document.getElementById('monthSelect').value = 'any';
                 document.getElementById('dateFrom').value = '';
