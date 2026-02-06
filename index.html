@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Моніторинг курсу валют</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 10px; background: #f4f4f9; }
+        canvas { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>Динаміка курсу валют</h1>
+    <canvas id="currencyChart"></canvas>
+
+    <script>
+        const csvUrl = 'currency_history.csv'; // Шлях до твого файлу
+
+        Papa.parse(csvUrl, {
+            download: true,
+            header: true,
+            complete: function(results) {
+                const data = results.data.filter(row => row.Date); // Відсікаємо порожні рядки
+                const labels = data.map(row => row.Date);
+                const usdSales = data.map(row => parseFloat(row.USD_Sale));
+
+                const ctx = document.getElementById('currencyChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Курс USD (Продаж)',
+                            data: usdSales,
+                            borderColor: '#2ecc71',
+                            backgroundColor: 'rgba(46, 204, 113, 0.2)',
+                            fill: true,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: { y: { beginAtZero: false } }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
