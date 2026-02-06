@@ -19,15 +19,14 @@
         select, input { padding: 10px; border-radius: 8px; border: 1px solid #dadce0; font-size: 14px; background: white; }
         .chart-wrapper { position: relative; height: 550px; width: 100%; margin-top: 20px; }
 
-        /* АДАПТАЦІЯ ДЛЯ МОБІЛЬНИХ ПРИСТРОЇВ */
         @media (max-width: 600px) {
             body { margin: 0; padding: 5px; }
             .container { padding: 15px; border-radius: 12px; }
             h1 { font-size: 20px; margin-bottom: 15px; }
             .controls { padding: 10px; gap: 10px; }
-            .control-group { min-width: 45%; } /* Кнопки стають у два стовпчики */
+            .control-group { min-width: 45%; }
             .chart-wrapper { height: 400px; margin-top: 10px; }
-            select, input { font-size: 16px; } /* Щоб iPhone не зумив при кліку */
+            select, input { font-size: 16px; }
         }
     </style>
 </head>
@@ -167,10 +166,8 @@
 
         const symbol = (base === 'UAH') ? ' ₴' : ' zł';
         const labels = filteredData.map(row => row['Дата'].split(' ')[0]);
-        
         const usdValues = filteredData.map(row => parseFloat(row[usdCol]) || null);
         const eurValues = filteredData.map(row => parseFloat(row[eurCol]) || null);
-        
         const crossRateValues = filteredData.map(row => {
             const uah = parseFloat(row[usdUahCol]);
             const pln = parseFloat(row[usdPlnCol]);
@@ -180,7 +177,6 @@
         const ctx = document.getElementById('currencyChart').getContext('2d');
         if (myChart) myChart.destroy();
 
-        // Хак для мобільної легенди
         const isMobile = window.innerWidth < 600;
 
         myChart = new Chart(ctx, {
@@ -195,7 +191,8 @@
                         backgroundColor: 'rgba(26, 115, 232, 0.05)', 
                         yAxisID: 'y',
                         fill: true, 
-                        tension: 0.3 
+                        tension: 0.3,
+                        hidden: isMobile // Приховуємо USD на мобілках за замовчуванням
                     },
                     { 
                         label: `EUR`, 
@@ -204,14 +201,15 @@
                         backgroundColor: 'rgba(233, 30, 99, 0.05)', 
                         yAxisID: 'y',
                         fill: true, 
-                        tension: 0.3 
+                        tension: 0.3,
+                        hidden: isMobile // Приховуємо EUR на мобілках за замовчуванням
                     },
                     { 
-                        label: `PLN/UAH`, 
+                        label: `1 PLN в UAH`, 
                         data: crossRateValues, 
                         borderColor: '#2ecc71', 
                         backgroundColor: 'transparent', 
-                        borderWidth: isMobile ? 2 : 4,
+                        borderWidth: isMobile ? 3 : 4,
                         yAxisID: 'yCross',
                         pointRadius: isMobile ? 1 : 3,
                         tension: 0.3 
@@ -225,37 +223,49 @@
                 scales: {
                     y: { 
                         type: 'linear',
-                        display: !isMobile, // Приховуємо ліву шкалу на мобільних для простору
+                        display: !isMobile,
                         position: 'left',
-                        ticks: { callback: value => value + symbol } 
+                        ticks: { callback: value => value.toFixed(2) + symbol } 
                     },
                     yCross: {
                         type: 'linear',
                         display: true,
-                        position: isMobile ? 'left' : 'right', // На мобільних ставимо основну шкалу зліва
-                        title: { display: !isMobile, text: 'Гривень за 1 злотий' },
-                        grid: { drawOnChartArea: !isMobile },
-                        ticks: { callback: value => value + ' ₴' }
+                        position: isMobile ? 'left' : 'right',
+                        ticks: { 
+                            callback: value => parseFloat(value).toFixed(2) + ' ₴',
+                            font: { size: 11, weight: 'bold' }
+                        },
+                        grid: { drawOnChartArea: !isMobile }
                     },
                     x: {
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45,
-                            font: { size: 10 }
-                        }
+                        ticks: { maxRotation: 45, minRotation: 45, font: { size: 10 } }
                     }
                 },
                 plugins: {
                     legend: {
                         position: isMobile ? 'bottom' : 'top',
                         labels: { boxWidth: 10, font: { size: 12 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== null) {
+                                    label += context.parsed.y + (context.datasetIndex === 2 ? ' ₴' : symbol);
+                                }
+                                return label;
+                            }
+                        }
                     }
                 }
             }
         });
     }
 
-    window.addEventListener('resize', updateDashboard);
+    window.addEventListener('resize', () => {
+        if (myChart) updateDashboard();
+    });
 
     ['periodSelect', 'monthSelect', 'dateFrom', 'dateTo', 'baseCurrency', 'sourceSelect'].forEach(id => {
         document.getElementById(id).addEventListener('change', (e) => {
