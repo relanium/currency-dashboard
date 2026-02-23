@@ -147,8 +147,15 @@
                 const d = parseCsvDate(row['Дата']);
                 return d >= from && d <= to;
             });
-        } else if (period !== 'all') {
-            filteredData = fullData.slice(-parseInt(period));
+        } else if (period !== 'all' && period !== 'custom') {
+            const daysToSubtract = parseInt(period);
+            const now = new Date();
+            const cutoffDate = new Date(now.setDate(now.getDate() - daysToSubtract));
+            
+            filteredData = fullData.filter(row => {
+                const d = parseCsvDate(row['Дата']);
+                return d >= cutoffDate;
+            });        
         }
 
         let usdCol, eurCol;
