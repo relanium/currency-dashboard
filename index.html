@@ -150,8 +150,11 @@
         } else if (period !== 'all' && period !== 'custom') {
             const daysToSubtract = parseInt(period);
             const now = new Date();
-            const cutoffDate = new Date(now.setDate(now.getDate() - daysToSubtract));
-            
+            // Встановлюємо межу: "сьогодні мінус N днів"
+            const cutoffDate = new Date();
+            cutoffDate.setDate(now.getDate() - daysToSubtract);
+            cutoffDate.setHours(0, 0, 0, 0); // Початок дня
+
             filteredData = fullData.filter(row => {
                 const d = parseCsvDate(row['Дата']);
                 return d >= cutoffDate;
